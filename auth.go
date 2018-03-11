@@ -83,6 +83,41 @@ func (cm *MManager) authSendCode(mconn *MConn, phonenumber string) (*MConn, *TL_
 	}
 }
 
+func (mconn *MConn) AuthSignUp(phoneNumber, phoneCode, phoneCodeHash, firstName, lastName string) (*TL_auth_authorization, error) {
+	log.Println("Start of signin")
+	if phoneNumber == "" || phoneCode == "" || phoneCodeHash == "" {
+		return nil, errors.New("MRProto::AuthSignIn one of function parameters is empty")
+	}
+
+	x := <-mconn.InvokeNonBlocked(TL_auth_signUp{
+		Phone_number:    phoneNumber,
+		Phone_code_hash: phoneCodeHash,
+		Phone_code:      phoneCode,
+		First_name:      firstName,
+		Last_name:       lastName,
+	})
+	if x.err != nil {
+		return nil, x.err
+	}
+
+	auth, ok := x.data.(TL_auth_authorization)
+
+	if !ok {
+		return nil, fmt.Errorf("RPC: %v", x)
+	}
+
+	user := auth.User.(TL_user)
+	session, err := mconn.Session()
+	if err != nil {
+		return &auth, err
+	}
+	session.user = &user
+	log.Println("Signed up as ", auth)
+
+	// save the session
+	//session.saveSession()
+	return &auth, nil
+}
 func (mconn *MConn) AuthSignIn(phoneNumber, phoneCode, phoneCodeHash string) (*TL_auth_authorization, error) {
 	log.Println("Start of signin")
 	if phoneNumber == "" || phoneCode == "" || phoneCodeHash == "" {
