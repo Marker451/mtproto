@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -82,7 +83,7 @@ type MSession struct {
 
 	dclist map[int32]string
 
-	proxyDialer net.Dialer
+	proxyDialer proxy.Dialer
 }
 
 type packetToSend struct {
@@ -168,6 +169,7 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 	// load session info from either session file or env
 	// its precedence is; preferredAddr > sessionFile > env
 	session := new(MSession)
+
 	session.phonenumber = phonenumber
 	if sessionExists {
 		session.f, err = os.OpenFile(sessionfile, os.O_RDONLY, 0600)
@@ -185,6 +187,8 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 			session.f, err = os.OpenFile(sessionfile, os.O_WRONLY|os.O_CREATE, 0600)
 		}
 	}
+
+	session.proxyDialer=appConfig.ProxyDialer
 
 	if err == nil {
 		if preferredAddr != "" {
@@ -204,6 +208,7 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 	}
 	if err == nil {
 		err = session.open(appConfig, /*sendQueue,*/ sessionListener, true)
+		session.proxyDialer=appConfig.ProxyDialer
 		if err == nil {
 			return session, nil
 		}

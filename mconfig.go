@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"runtime"
 	"time"
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -25,10 +26,10 @@ type Configuration struct {
 	SessionHome   string
 	PingInterval  time.Duration
 	SendInterval  time.Duration
-	ProxyDialer   net.Dialer
+	ProxyDialer   proxy.Dialer
 }
 
-func NewConfiguration(id int32, hash, version, deviceModel, systemVersion, language string, sessionFileHome string, pingInterval time.Duration, sendInterval time.Duration) (Configuration, error) {
+func NewConfiguration(id int32, hash, version, deviceModel, systemVersion, language string, sessionFileHome string, pingInterval time.Duration, sendInterval time.Duration, proxyDialer ...proxy.Dialer) (Configuration, error) {
 	//appConfig := new(Configuration)
 	appConfig := Configuration{}
 
@@ -38,6 +39,12 @@ func NewConfiguration(id int32, hash, version, deviceModel, systemVersion, langu
 	appConfig.Id = id
 	appConfig.Hash = hash
 	appConfig.Version = version
+
+	if len(proxyDialer) > 0 {
+		appConfig.ProxyDialer = proxyDialer[0]
+	} else {
+		appConfig.ProxyDialer = &net.Dialer{}
+	}
 
 	appConfig.DeviceModel = deviceModel
 	if deviceModel == "" {

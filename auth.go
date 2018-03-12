@@ -84,9 +84,9 @@ func (cm *MManager) authSendCode(mconn *MConn, phonenumber string) (*MConn, *TL_
 }
 
 func (mconn *MConn) AuthSignUp(phoneNumber, phoneCode, phoneCodeHash, firstName, lastName string) (*TL_auth_authorization, error) {
-	log.Println("Start of signin")
+	log.Println("Start of signup")
 	if phoneNumber == "" || phoneCode == "" || phoneCodeHash == "" {
-		return nil, errors.New("MRProto::AuthSignIn one of function parameters is empty")
+		return nil, errors.New("MRProto::AuthSignUp one of function parameters is empty")
 	}
 
 	x := <-mconn.InvokeNonBlocked(TL_auth_signUp{
