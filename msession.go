@@ -81,6 +81,8 @@ type MSession struct {
 	updatesState *TL_updates_state
 
 	dclist map[int32]string
+
+	proxyDialer net.Dialer
 }
 
 type packetToSend struct {
@@ -123,6 +125,7 @@ func newSession(phonenumber string, addr string, useIPv6 bool, appConfig Configu
 
 	session := new(MSession)
 	session.phonenumber = phonenumber
+	session.proxyDialer = appConfig.ProxyDialer
 	session.f, err = os.OpenFile(sessionFilePath(appConfig.SessionHome, phonenumber), os.O_WRONLY|os.O_CREATE, 0600)
 	if err == nil {
 		session.addr = addr
@@ -229,10 +232,14 @@ func (session *MSession) open(appConfig Configuration, /*sendQueue chan packetTo
 		return err
 	}
 	slog.Logf(session, "dial TCP to %s\n", session.addr)
-	session.tcpconn, err = net.DialTCP("tcp", nil, tcpAddr)
+
+	conn, err := session.proxyDialer.Dial("tcp", tcpAddr.String())
+
 	if err != nil {
 		return err
 	}
+
+	session.tcpconn = conn.(*net.TCPConn)
 	// Packet Length is encoded by a single byte (see: https://core.telegram.org/mtproto)
 	_, err = session.tcpconn.Write([]byte{0xef})
 	if err != nil {

@@ -2,6 +2,7 @@ package mtproto
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"runtime"
@@ -24,6 +25,7 @@ type Configuration struct {
 	SessionHome   string
 	PingInterval  time.Duration
 	SendInterval  time.Duration
+	ProxyDialer   net.Dialer
 }
 
 func NewConfiguration(id int32, hash, version, deviceModel, systemVersion, language string, sessionFileHome string, pingInterval time.Duration, sendInterval time.Duration) (Configuration, error) {
