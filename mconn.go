@@ -214,6 +214,9 @@ func (mconn *MConn) monitorSession() {
 			case SessionEstablished: // never triggered on mconn
 			case discardSession: // triggered only on reconnect (either renewSession or refreshSession)
 				go func() {
+					defer func(){
+						recover()
+					}()
 					// Unbind the session until the connection has new session
 					slog.Logf(mconn, "session will be discarded%d\n", mconn.session.sessionId)
 					e := e.(discardSession)
