@@ -139,6 +139,26 @@ func (mm *MManager) NewAuthentication(phonenumber string, addr string, useIPv6 b
 
 	return mconn, sentCode, nil
 }
+func (mm *MManager)CheckPhone(phonenumber string, addr string, useIPv6 bool) (bool, error) {
+	// req connect
+	respCh := make(chan sessionResponse)
+	mm.eventq <- newsession{0, phonenumber, addr, useIPv6, respCh}
+
+	// Wait for connection
+	resp := <-respCh
+	if resp.err != nil {
+		return false,resp.err
+	}
+
+	// sendAuthCode
+	mconn := mm.conns[resp.connId]
+	registed, err := mm.checkPhone(mconn, phonenumber)
+	if err != nil {
+		return registed, err
+	}
+
+	return registed, nil
+}
 
 func (mm *MManager) manageRoutine() {
 	slog.Logln(mm, "start")
@@ -259,7 +279,9 @@ func (mm *MManager) manageRoutine() {
 					e := e.(discardSession)
 					slog.Logln(mm, "discard session ", e.sessionId)
 					session := mm.sessions[e.sessionId]
-					session.close()
+					if session != nil {
+						session.close()
+					}
 
 					// Immediate assignment of discarded session's updates state
 					// The assignment on handling SessionDiscarded event is sometimes slower than new sessionBound

@@ -32,6 +32,26 @@ func (mconn *MConn) authSendCode(phonenumber string) (*TL_auth_sentCode, error) 
 		return nil, fmt.Errorf("authSendCode: Got: %T", *data)
 	}
 }
+func (mconn *MConn)checkPhone(phonenumber string) (bool, error) {
+	data, err := mconn.InvokeBlocked(TL_auth_checkPhone{phonenumber})
+	if err != nil {
+		return false, err
+	}
+	switch (*data).(type) {
+	case TL_auth_checkedPhone:
+		checkedPhone := (*data).(TL_auth_checkedPhone)
+		if _, ok := checkedPhone.Phone_registered.(TL_boolFalse);ok{
+			return false, nil
+		}
+		if _, ok := checkedPhone.Phone_registered.(TL_boolTrue);ok{
+			return true, nil
+		}
+		return false, fmt.Errorf("assert bool err")
+
+	default:
+		return false, fmt.Errorf("checkedPhone: Got: %T", *data)
+	}
+}
 
 func (cm *MManager) authSendCode(mconn *MConn, phonenumber string) (*MConn, *TL_auth_sentCode, error) {
 	for {
@@ -78,6 +98,55 @@ func (cm *MManager) authSendCode(mconn *MConn, phonenumber string) (*MConn, *TL_
 				}
 			} else {
 				return nil, nil, err
+			}
+		}
+	}
+}
+func (cm *MManager)checkPhone (mconn *MConn, phonenumber string) (bool, error) {
+	for {
+		registed, err := mconn.checkPhone(phonenumber)
+		if err == nil {
+			return registed, nil
+		} else {
+			// Handle RPC error
+			if rpcError, ok := err.(TL_rpc_error); ok {
+				switch rpcError.error_code {
+				case errorSeeOther:
+					var newdc int32
+					n, _ := fmt.Sscanf(rpcError.error_message, "PHONE_MIGRATE_%d", &newdc)
+					if n != 1 {
+						n, _ = fmt.Sscanf(rpcError.error_message, "NETWORK_MIGRATE_%d", &newdc)
+					}
+					if n != 1 {
+						return false, err
+					} else {
+						// Reconnect to the new datacenter
+						session, err := mconn.Session()
+						if err != nil {
+							return false, err
+						}
+						respch := make(chan sessionResponse)
+
+						//TODO: Check if renewSession event works with mconn.notify()
+						mconn.notify(renewSession{
+							session.sessionId,
+							phonenumber,
+							session.dclist[newdc],
+							session.useIPv6,
+							respch,
+						})
+
+						// Wait for binding with new session
+						resp := <-respch
+						if resp.err != nil {
+							return false, resp.err
+						}
+					}
+				default:
+					return false, err
+				}
+			} else {
+				return false, err
 			}
 		}
 	}
