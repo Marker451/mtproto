@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cjongseok/slog"
+	"golang.org/x/net/proxy"
 	"io"
 	"math/rand"
 	"net"
@@ -14,7 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"golang.org/x/net/proxy"
 )
 
 const (
@@ -121,7 +121,7 @@ func sessionFilePath(sessionFileHome string, phonenumber string) string {
 	return sessionFileHome + "/.telegram_" + phonenumber
 }
 
-func newSession(phonenumber string, addr string, useIPv6 bool, appConfig Configuration, /*sendQueue chan packetToSend,*/ sessionListener chan MEvent) (*MSession, error) {
+func newSession(phonenumber string, addr string, useIPv6 bool, appConfig Configuration /*sendQueue chan packetToSend,*/, sessionListener chan MEvent) (*MSession, error) {
 	var err error
 
 	session := new(MSession)
@@ -132,7 +132,7 @@ func newSession(phonenumber string, addr string, useIPv6 bool, appConfig Configu
 		session.addr = addr
 		session.useIPv6 = useIPv6
 		session.encrypted = false
-		err = session.open(appConfig, /*sendQueue,*/ sessionListener, false)
+		err = session.open(appConfig /*sendQueue,*/, sessionListener, false)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func byteArrayString2byteArray(str string) []byte {
 // Build a connection from the session file
 // returned session contains the same session with the file but session id,
 // since the session file does not have session id
-func loadSession(phonenumber string, preferredAddr string, appConfig Configuration, /*sendQueue chan packetToSend,*/ sessionListener chan MEvent) (*MSession, error) {
+func loadSession(phonenumber string, preferredAddr string, appConfig Configuration /*sendQueue chan packetToSend,*/, sessionListener chan MEvent) (*MSession, error) {
 	// session file exists?
 	sessionfile := sessionFilePath(appConfig.SessionHome, phonenumber)
 	_, err := os.Stat(sessionfile)
@@ -188,10 +188,10 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 		}
 	}
 
-	session.proxyDialer=appConfig.ProxyDialer
+	session.proxyDialer = appConfig.ProxyDialer
 
 	if err == nil {
-		if preferredAddr != "" {
+		if preferredAddr != "" && session.addr == "" {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", preferredAddr)
 			if err == nil {
 				if tcpAddr.IP.To4() != nil {
@@ -207,8 +207,8 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 		}
 	}
 	if err == nil {
-		err = session.open(appConfig, /*sendQueue,*/ sessionListener, true)
-		session.proxyDialer=appConfig.ProxyDialer
+		err = session.open(appConfig /*sendQueue,*/, sessionListener, true)
+		session.proxyDialer = appConfig.ProxyDialer
 		if err == nil {
 			return session, nil
 		}
@@ -221,7 +221,7 @@ func loadSession(phonenumber string, preferredAddr string, appConfig Configurati
 	return nil, fmt.Errorf("Load Session Failure: cannot get session info:", err)
 }
 
-func (session *MSession) open(appConfig Configuration, /*sendQueue chan packetToSend,*/ sessionListener chan MEvent, getUpdateStates bool) error {
+func (session *MSession) open(appConfig Configuration /*sendQueue chan packetToSend,*/, sessionListener chan MEvent, getUpdateStates bool) error {
 	var err error
 	var tcpAddr *net.TCPAddr
 
@@ -237,7 +237,6 @@ func (session *MSession) open(appConfig Configuration, /*sendQueue chan packetTo
 		return err
 	}
 	slog.Logf(session, "dial TCP to %s\n", session.addr)
-
 	conn, err := session.proxyDialer.Dial("tcp", tcpAddr.String())
 
 	if err != nil {
